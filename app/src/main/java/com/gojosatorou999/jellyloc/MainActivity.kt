@@ -68,6 +68,8 @@ class MainActivity : ComponentActivity() {
                         setupReady = true,
                         onQueryChanged = viewModel::onQueryChanged,
                         onSuggestionSelected = viewModel::onSuggestionSelected,
+                        onMapLongPressed = viewModel::onMapLongPressed,
+                        onToggleFavorite = viewModel::toggleFavoriteSelected,
                         onToggleMock = {
                             val selected = state.selectedPlace ?: return@MainScreen
                             if (state.isMocking) {
