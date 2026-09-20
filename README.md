@@ -112,3 +112,20 @@ This is for testing, development, and privacy (e.g., not sharing my real spot). 
 	4.	Do I want any v2 items pulled into v1? ans:yeah all.
 
 
+
+## Vercel deployment
+
+This repository is primarily an Android app source project.  
+For Vercel, a static landing page is included with:
+
+- `/index.html`
+- `/vercel.json`
+
+Deploy steps:
+
+1. Import this repository in Vercel.
+2. Set **Framework Preset** to **Other**.
+3. Leave build command empty.
+4. Deploy.
+
+Vercel will serve `index.html` for all routes using `vercel.json` rewrites.
