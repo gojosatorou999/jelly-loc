@@ -2,6 +2,7 @@ package com.gojosatorou999.jellyloc.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,20 +12,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +40,8 @@ import com.gojosatorou999.jellyloc.viewmodel.MainUiState
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.MapEventsReceiver
 import org.osmdroid.views.overlay.Marker
 
 @Composable
@@ -42,10 +50,16 @@ fun MainScreen(
     setupReady: Boolean,
     onQueryChanged: (String) -> Unit,
     onSuggestionSelected: (PlaceSuggestion) -> Unit,
+    onMapLongPressed: (Double, Double) -> Unit,
+    onToggleFavorite: () -> Unit,
     onToggleMock: () -> Unit,
 ) {
     val context = LocalContext.current
     val selected = uiState.selectedPlace
+    val onMapLongPressState = rememberUpdatedState(onMapLongPressed)
+    val isFavorite = selected != null && uiState.favoritePlaces.any {
+        it.latitude == selected.latitude && it.longitude == selected.longitude
+    }
 
     DisposableEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
@@ -99,6 +113,19 @@ fun MainScreen(
                     setMultiTouchControls(true)
                     controller.setZoom(14.0)
                     controller.setCenter(GeoPoint(17.385f.toDouble(), 78.4867))
+                    overlays.add(
+                        MapEventsOverlay(
+                            object : MapEventsReceiver {
+                                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
+
+                                override fun longPressHelper(p: GeoPoint?): Boolean {
+                                    p ?: return false
+                                    onMapLongPressState.value(p.latitude, p.longitude)
+                                    return true
+                                }
+                            },
+                        ),
+                    )
                 }
             }
 
@@ -130,6 +157,7 @@ fun MainScreen(
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val status = when {
                     !setupReady -> "Setup needed"
+                    uiState.isMocking && selected != null -> "Mocking: ${selected.name}"
                     uiState.isMocking -> "Mocking"
                     else -> "Idle"
                 }
@@ -143,10 +171,25 @@ fun MainScreen(
                     Text(selected.name, style = MaterialTheme.typography.titleMedium)
                     Text("${selected.latitude}, ${selected.longitude}")
                 } else {
-                    Text("Pick a place to continue")
+                    Text("Search or long-press the map to pick a place")
                 }
 
                 uiState.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+                if (uiState.favoritePlaces.isNotEmpty()) {
+                    QuickPlacesRow(
+                        title = "Favorites",
+                        places = uiState.favoritePlaces,
+                        onPick = onSuggestionSelected,
+                    )
+                }
+                if (uiState.recentPlaces.isNotEmpty()) {
+                    QuickPlacesRow(
+                        title = "Recent",
+                        places = uiState.recentPlaces,
+                        onPick = onSuggestionSelected,
+                    )
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -155,6 +198,15 @@ fun MainScreen(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(if (uiState.isMocking) "Stop" else "Set Location")
+                    }
+                    OutlinedButton(
+                        onClick = onToggleFavorite,
+                        enabled = selected != null,
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
@@ -167,6 +219,30 @@ fun MainScreen(
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(8.dp),
                     )
+                }
+            }
+        }
+
+        @Composable
+        private fun QuickPlacesRow(
+            title: String,
+            places: List<PlaceSuggestion>,
+            onPick: (PlaceSuggestion) -> Unit,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(title, style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    places.forEach { place ->
+                        AssistChip(
+                            onClick = { onPick(place) },
+                            label = { Text(place.name.ifBlank { "${place.latitude}, ${place.longitude}" }) },
+                        )
+                    }
                 }
             }
         }

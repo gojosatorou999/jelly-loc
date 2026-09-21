@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jelly Loc</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d12;
+      --card: #151a22;
+      --text: #e8ecf3;
+      --muted: #a4b0c0;
+      --accent: #77a8ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(720px, 100%);
+      background: var(--card);
+      border: 1px solid #202737;
+      border-radius: 14px;
+      padding: 28px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.9rem; }
+    p { color: var(--muted); line-height: 1.55; }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Jelly Loc</h1>
+    <p>
+      Jelly Loc is an Android mock-location app built with Kotlin + Jetpack Compose.
+      This Vercel deployment hosts a lightweight project landing page.
+    </p>
+    <p>
+      Source and full setup details:
+      <a href="https://github.com/gojosatorou999/jelly-loc" target="_blank" rel="noopener noreferrer">
+        github.com/gojosatorou999/jelly-loc
+      </a>
+    </p>
+  </main>
+</body>
+</html>
