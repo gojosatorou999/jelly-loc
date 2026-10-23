@@ -55,41 +55,10 @@ state: Dict[str, Any] = {
     "sim_mode": "static",  # static | walking | cycling | driving
     "sim_speed_kmh": 5.0,
     "updated_at": datetime.now(timezone.utc).isoformat(),
-    "favorites": [
-        {
-            "name": "Charminar",
-            "address": "Hyderabad, Telangana, India",
-            "latitude": 17.361563,
-            "longitude": 78.474665,
-        },
-        {
-            "name": "Eiffel Tower",
-            "address": "Champ de Mars, 5 Av. Anatole France, 75007 Paris, France",
-            "latitude": 48.858370,
-            "longitude": 2.294481,
-        },
-        {
-            "name": "Times Square",
-            "address": "Manhattan, NY 10036, United States",
-            "latitude": 40.758896,
-            "longitude": -73.985130,
-        },
-        {
-            "name": "Tokyo Tower",
-            "address": "4 Chome-2-8 Shibakoen, Minato City, Tokyo 105-0011, Japan",
-            "latitude": 35.658581,
-            "longitude": 139.745438,
-        },
-    ],
-    "recents": [
-        {
-            "name": "Charminar",
-            "address": "Hyderabad, Telangana, India",
-            "latitude": 17.361563,
-            "longitude": 78.474665,
-        }
-    ],
+    "favorites": [],
+    "recents": [],
 }
+
 
 
 # ---------------------------------------------------------------------------

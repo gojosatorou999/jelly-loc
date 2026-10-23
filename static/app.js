@@ -29,6 +29,7 @@
     simSpeedKmh: 5.0,
     favorites: [],
     recents: [],
+    firstLoad: true,
     wakeLock: null,
     joystickOpen: false,
     joystickInterval: null,
@@ -101,11 +102,18 @@
       attributionControl: false,
     });
 
-    // Dark Matter CartoDB Basemap Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(mapInstance);
+    // Esri Dark Gray Canvas — free, no API key required
+    const baseLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 16, attribution: 'Tiles &copy; Esri' }
+    );
+    // Reference/label layer on top
+    const labelLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 16, opacity: 0.8 }
+    );
+    baseLayer.addTo(mapInstance);
+    labelLayer.addTo(mapInstance);
 
     // Custom Glowing Neon Pulsing Marker
     const customIcon = L.divIcon({

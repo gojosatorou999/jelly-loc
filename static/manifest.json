@@ -34,28 +34,5 @@
       "sizes": "any",
       "type": "image/svg+xml"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Charminar, Hyderabad",
-      "short_name": "Charminar",
-      "description": "Teleport mock location to Charminar",
-      "url": "/?lat=17.361563&lng=78.474665&name=Charminar",
-      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Eiffel Tower, Paris",
-      "short_name": "Eiffel Tower",
-      "description": "Teleport mock location to Eiffel Tower",
-      "url": "/?lat=48.858370&lng=2.294481&name=Eiffel+Tower",
-      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Times Square, New York",
-      "short_name": "Times Square",
-      "description": "Teleport mock location to Times Square",
-      "url": "/?lat=40.758896&lng=-73.985130&name=Times+Square",
-      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
-    }
   ]
 }
