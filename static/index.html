@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Jelly Loc — GPS Simulator &amp; Mock Location PWA</title>
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="Set custom mock GPS locations, simulate movement routes, and export GPX for iOS &amp; Android. Seamless PWA deployable on Vercel." />
+  <meta name="theme-color" content="#080c16" />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- Apple iOS PWA Meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Jelly Loc" />
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+
+  <!-- Web App Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon.png" />
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg" />
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Custom App Styles -->
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div id="app-container">
+    <!-- Background Interactive Leaflet Map -->
+    <div id="map"></div>
+
+    <!-- UI Overlay Layer -->
+    <div class="ui-layer">
+      <!-- Top Floating Navigation & Search Bar -->
+      <header class="top-container">
+        <nav class="top-nav interactive">
+          <a href="/" class="brand">
+            <img src="/static/icons/icon.svg" alt="Jelly Loc" class="brand-icon" />
+            <span class="brand-title">Jelly Loc</span>
+          </a>
+
+          <div id="status-pill" class="status-pill">
+            <span class="status-indicator"></span>
+            <span id="status-text">Idle</span>
+          </div>
+
+          <div class="nav-actions">
+            <button id="btn-install-pwa" class="btn-icon" title="Install App to Home Screen" style="display: none;">
+              📲
+            </button>
+            <button id="btn-open-guide" class="btn-icon" title="iOS &amp; Android Setup Guide">
+              📖
+            </button>
+            <button id="btn-open-settings" class="btn-icon" title="Settings &amp; GPS Jitter">
+              ⚙️
+            </button>
+          </div>
+        </nav>
+
+        <!-- Search Autocomplete Input -->
+        <div class="search-container interactive">
+          <div class="search-box">
+            <span style="font-size: 1.1rem; margin-right: 6px;">🔍</span>
+            <input
+              id="search-input"
+              class="search-input"
+              type="text"
+              placeholder="Search place or paste lat, lng..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div id="search-spinner" class="search-spinner"></div>
+            <button id="search-clear" class="search-btn-clear" aria-label="Clear Search">✕</button>
+          </div>
+
+          <!-- Autocomplete Dropdown List -->
+          <div id="suggestions-card" class="suggestions-card"></div>
+        </div>
+      </header>
+
+      <!-- Side Floating Action Buttons -->
+      <aside class="side-controls interactive">
+        <button id="btn-locate-me" class="side-fab" title="Current GPS Location">
+          🎯
+        </button>
+        <button id="btn-toggle-joystick" class="side-fab" title="Toggle Virtual Joystick">
+          🕹️
+        </button>
+      </aside>
+
+      <!-- Virtual Joystick D-Pad (Floating Overlay) -->
+      <section id="joystick-panel" class="joystick-panel interactive" aria-label="Virtual Joystick">
+        <div class="joystick-header">
+          <span>JOYSTICK D-PAD</span>
+          <span style="font-size: 0.72rem; color: var(--accent-cyan);">WASD / TOUCH</span>
+        </div>
+        <div id="joystick-base" class="joystick-base">
+          <div id="joystick-nub" class="joystick-nub"></div>
+        </div>
+        <div class="joystick-speed-bar">
+          <button class="speed-chip selected" data-speed="5">Walk (5k)</button>
+          <button class="speed-chip" data-speed="20">Bike (20k)</button>
+          <button class="speed-chip" data-speed="60">Drive (60k)</button>
+        </div>
+      </section>
+
+      <!-- Bottom Sheet Control Drawer -->
+      <footer class="bottom-container">
+        <div class="bottom-card interactive">
+          <!-- Place Title & Favorite -->
+          <div class="place-header">
+            <div class="place-text-group">
+              <h1 id="place-title" class="place-title">Charminar, Hyderabad</h1>
+              <div class="place-coords-row">
+                <span id="place-coords" class="coords-badge" title="Click to copy coordinates">17.361563, 78.474665</span>
+                <span id="btn-copy-coords" style="cursor: pointer; font-size: 0.85rem;" title="Copy">📋</span>
+              </div>
+            </div>
+            <button id="btn-favorite" class="btn-favorite" title="Add to Favorites">
+              <span id="favorite-icon">♡</span>
+            </button>
+          </div>
+
+          <!-- Live Telemetry / GPS Sensor Readout -->
+          <div class="telemetry-row">
+            <div class="telemetry-item">
+              <span class="telemetry-label">LAT</span>
+              <span id="telemetry-lat" class="telemetry-value">17.36156</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">LON</span>
+              <span id="telemetry-lon" class="telemetry-value">78.47466</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">ACCURACY</span>
+              <span id="telemetry-acc" class="telemetry-value">±7.0m</span>
+            </div>
+          </div>
+
+          <!-- Quick Favorites and Recents Horizontal Chips -->
+          <div id="chips-container" class="chips-scroll"></div>
+
+          <!-- Main Action Buttons -->
+          <div class="action-row">
+            <button id="btn-set-mock" class="btn-primary-action">
+              <span id="btn-set-mock-text">Set Location</span>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Modal 1: iOS & Android Setup & Export Guide -->
+    <div id="guide-modal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2 class="modal-title">Device Setup &amp; Emulation Guide</h2>
+          <button class="btn-close-modal btn-icon">✕</button>
+        </div>
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" data-tab="tab-ios">🍎 iOS Setup</button>
+          <button class="modal-tab-btn" data-tab="tab-android">🤖 Android Setup</button>
+          <button class="modal-tab-btn" data-tab="tab-pwa">📲 PWA Install</button>
+          <button class="modal-tab-btn" data-tab="tab-hook">🌐 Web GPS Hook</button>
+        </div>
+        <div class="modal-content">
+          <!-- iOS Tab -->
+          <div id="tab-ios" class="guide-tab-content" style="display: flex; flex-direction: column; gap: 14px;">
+            <p>On iOS, virtual location can be simulated using <strong>Xcode GPX files</strong>, <strong>LocationSimulator</strong>, or <strong>Apple Shortcuts</strong>:</p>
+            
+            <div class="guide-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <strong>Download Active GPX File</strong>
+                <span>Directly downloads standard GPX waypoint for Xcode / 3uTools / LocationSimulator.</span>
+                <button id="btn-download-gpx" class="btn-secondary" style="margin-top: 6px; width: fit-content;">
+                  ⬇️ Download Current GPX
+                </button>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <strong>Apple Shortcuts One-Tap Webhook</strong>
+                <span>Open iOS Shortcuts app → Add Action: "Get Contents of URL" pointing to:</span>
+                <div class="code-snippet">
+                  <span id="shortcut-url">/api/ios/shortcut</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Android Tab -->
+          <div id="tab-android" class="guide-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+            <p>To use mock locations across Android apps (WhatsApp, Maps, etc.):</p>
+            <div class="guide-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <strong>Enable Developer Options</strong>
+                <span>Go to <em>Settings → About Phone → Software info</em> and tap <strong>Build Number 7 times</strong>.</span>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <strong>ADB Mock Location Script</strong>
+                <span>Run this one-liner in your terminal with USB debugging enabled:</span>
+                <button id="btn-download-adb" class="btn-secondary" style="margin-top: 6px; width: fit-content;">
+                  ⬇️ Download ADB Shell Script
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PWA Install Tab -->
+          <div id="tab-pwa" class="guide-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+            <p>Jelly Loc runs natively as a fullscreen Progressive Web App with offline caching:</p>
+            <div class="guide-step">
+              <div class="step-num">🍎</div>
+              <div class="step-body">
+                <strong>On iPhone / iPad (Safari)</strong>
+                <span>Tap the <strong>Share</strong> button (box with upward arrow) at the bottom → Scroll down and tap <strong>Add to Home Screen</strong>.</span>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">🤖</div>
+              <div class="step-body">
+                <strong>On Android (Chrome / Brave)</strong>
+                <span>Tap the 3-dots menu in Chrome → Tap <strong>Install app</strong> or <strong>Add to Home Screen</strong>.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Web GPS Hook Tab -->
+          <div id="tab-hook" class="guide-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+            <p>Inject mock coordinates into any browser tab (WhatsApp Web, Maps, etc.) using our JavaScript Geolocation hook:</p>
+            <button id="btn-copy-hook" class="btn-secondary" style="width: fit-content;">
+              📋 Copy Geolocation Bookmarklet
+            </button>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">
+              Bookmark this script in Mobile Safari or Chrome. Whenever you visit a site requesting location, click the bookmarklet to inject this active mock location!
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary btn-close-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 2: Settings & Jitter -->
+    <div id="settings-modal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2 class="modal-title">Settings &amp; GPS Simulation</h2>
+          <button class="btn-close-modal btn-icon">✕</button>
+        </div>
+        <div class="modal-content">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <strong>Realistic GPS Jitter</strong>
+              <div style="font-size: 0.8rem; color: var(--text-dim);">Simulates natural satellite drift so apps don't detect a frozen location.</div>
+            </div>
+            <input type="checkbox" id="setting-jitter" checked style="width: 20px; height: 20px; accent-color: var(--accent-cyan);" />
+          </div>
+
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <strong>Jitter Range</strong>
+              <span id="setting-jitter-val" style="color: var(--accent-cyan); font-weight: 600;">±4.5m</span>
+            </div>
+            <input type="range" id="setting-jitter-meters" min="1" max="15" step="0.5" value="4.5" style="width: 100%; accent-color: var(--accent-cyan);" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-accent btn-close-modal">Save &amp; Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Toast Message -->
+    <div id="toast" class="toast">Location updated</div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Application Script -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

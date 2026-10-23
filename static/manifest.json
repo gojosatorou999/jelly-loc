@@ -1,0 +1,61 @@
+{
+  "name": "Jelly Loc — GPS Simulator & Mock Location",
+  "short_name": "Jelly Loc",
+  "description": "Mock location emulator and GPS spoofer for iOS & Android with route simulation, virtual joystick, and GPX export.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#080c16",
+  "theme_color": "#080c16",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["utilities", "developer", "navigation"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Charminar, Hyderabad",
+      "short_name": "Charminar",
+      "description": "Teleport mock location to Charminar",
+      "url": "/?lat=17.361563&lng=78.474665&name=Charminar",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Eiffel Tower, Paris",
+      "short_name": "Eiffel Tower",
+      "description": "Teleport mock location to Eiffel Tower",
+      "url": "/?lat=48.858370&lng=2.294481&name=Eiffel+Tower",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Times Square, New York",
+      "short_name": "Times Square",
+      "description": "Teleport mock location to Times Square",
+      "url": "/?lat=40.758896&lng=-73.985130&name=Times+Square",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

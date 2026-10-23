@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+.vercel/
+data/saved_state.json
+repo_source/
