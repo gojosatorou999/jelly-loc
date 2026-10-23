@@ -1,17 +1,19 @@
 // Jelly Loc PWA Service Worker
-const CACHE_NAME = 'jelly-loc-v2.0.0';
+const CACHE_NAME = 'jelly-loc-v2.1.0';
 const STATIC_ASSETS = [
   '/',
+  '/manifest.json',
+  '/sw.js',
   '/static/styles.css',
   '/static/app.js',
-  '/static/manifest.json',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/apple-touch-icon.png',
   '/static/icons/favicon.png',
   '/static/icons/icon.svg',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap',
 ];
 
 self.addEventListener('install', (event) => {

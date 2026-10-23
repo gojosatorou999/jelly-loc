@@ -53,7 +53,6 @@
     telemetryLat: document.getElementById('telemetry-lat'),
     telemetryLon: document.getElementById('telemetry-lon'),
     telemetryAcc: document.getElementById('telemetry-acc'),
-    telemetrySpeed: document.getElementById('telemetry-speed'),
     btnSetMock: document.getElementById('btn-set-mock'),
     btnSetMockText: document.getElementById('btn-set-mock-text'),
     chipsContainer: document.getElementById('chips-container'),
@@ -263,10 +262,9 @@
   function updateTelemetryUI() {
     const lat = state.effectiveCoords.latitude;
     const lon = state.effectiveCoords.longitude;
-    el.telemetryLat.textContent = lat.toFixed(5);
-    el.telemetryLon.textContent = lon.toFixed(5);
-    el.telemetryAcc.textContent = `±${state.accuracy.toFixed(1)}m`;
-    el.telemetrySpeed.textContent = `${state.simSpeedKmh.toFixed(0)} km/h`;
+    if (el.telemetryLat) el.telemetryLat.textContent = lat.toFixed(5);
+    if (el.telemetryLon) el.telemetryLon.textContent = lon.toFixed(5);
+    if (el.telemetryAcc) el.telemetryAcc.textContent = `±${state.accuracy.toFixed(1)}m`;
   }
 
   function renderChips() {
@@ -603,6 +601,12 @@
 
   // --- Event Listeners Setup ---
   function setupEventListeners() {
+    // Populate iOS shortcut full URL
+    const shortcutUrlEl = document.getElementById('shortcut-url');
+    if (shortcutUrlEl) {
+      shortcutUrlEl.textContent = `${window.location.origin}/api/ios/shortcut`;
+    }
+
     // Primary Actions
     el.btnSetMock.onclick = toggleMock;
     el.btnFavorite.onclick = toggleFavorite;
