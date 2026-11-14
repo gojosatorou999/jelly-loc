@@ -1,9 +1,11 @@
 package com.gojosatorou999.jellyloc.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gojosatorou999.jellyloc.data.NominatimPlacesRepository
 import com.gojosatorou999.jellyloc.data.PlaceSuggestion
+import com.gojosatorou999.jellyloc.data.PlacesStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,10 +14,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class MainViewModel(
-    private val repository: NominatimPlacesRepository = NominatimPlacesRepository(),
-) : ViewModel() {
-    private val _uiState = MutableStateFlow(MainUiState())
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = NominatimPlacesRepository()
+    private val store = PlacesStore(application)
+
+    private val _uiState = MutableStateFlow(
+        MainUiState(
+            selectedPlace = store.loadSelected(),
+            favoritePlaces = store.loadFavorites(),
+            recentPlaces = store.loadRecents(),
+        ),
+    )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
@@ -28,14 +37,7 @@ class MainViewModel(
             _uiState.update {
                 it.copy(
                     isSearching = false,
-                    suggestions = listOf(
-                        PlaceSuggestion(
-                            name = "Pinned coordinates",
-                            address = "$lat, $lng",
-                            latitude = lat,
-                            longitude = lng,
-                        ),
-                    ),
+                    suggestions = listOf(PlaceSuggestion("Pinned coordinates", "$lat, $lng", lat, lng)),
                 )
             }
             return
@@ -48,18 +50,20 @@ class MainViewModel(
 
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true) }
-            delay(300)
+            delay(400) // debounce typing; also keeps us within Nominatim's usage policy
             runCatching { repository.search(query) }
                 .onSuccess { places ->
-                    _uiState.update { it.copy(suggestions = places, isSearching = false) }
+                    _uiState.update {
+                        it.copy(
+                            suggestions = places,
+                            isSearching = false,
+                            error = if (places.isEmpty()) "No results for \"$query\"" else null,
+                        )
+                    }
                 }
                 .onFailure {
                     _uiState.update {
-                        it.copy(
-                            suggestions = emptyList(),
-                            isSearching = false,
-                            error = "Search failed. Check internet and try again.",
-                        )
+                        it.copy(suggestions = emptyList(), isSearching = false, error = "Search failed. Check internet and try again.")
                     }
                 }
         }
@@ -69,26 +73,19 @@ class MainViewModel(
         _uiState.update {
             it.copy(
                 selectedPlace = place,
-                query = place.name,
+                query = "",
                 suggestions = emptyList(),
-                recentPlaces = (listOf(place) + it.recentPlaces.filterNot { recent -> isSamePlace(recent, place) }).take(6),
+                error = null,
+                recentPlaces = (listOf(place) + it.recentPlaces.filterNot { recent -> isSamePlace(recent, place) }).take(8),
             )
         }
+        persist()
     }
 
-    fun onMapLongPressed(latitude: Double, longitude: Double) {
+    fun onMapPicked(latitude: Double, longitude: Double) {
         onSuggestionSelected(
-            PlaceSuggestion(
-                name = "Dropped pin",
-                address = "$latitude, $longitude",
-                latitude = latitude,
-                longitude = longitude,
-            ),
+            PlaceSuggestion("Dropped pin", "%.6f, %.6f".format(latitude, longitude), latitude, longitude),
         )
-    }
-
-    fun setMocking(active: Boolean) {
-        _uiState.update { it.copy(isMocking = active) }
     }
 
     fun toggleFavoriteSelected() {
@@ -98,26 +95,30 @@ class MainViewModel(
             val updated = if (exists) {
                 state.favoritePlaces.filterNot { isSamePlace(it, selected) }
             } else {
-                (listOf(selected) + state.favoritePlaces.filterNot { isSamePlace(it, selected) }).take(10)
+                (listOf(selected) + state.favoritePlaces).take(20)
             }
             state.copy(favoritePlaces = updated)
         }
+        persist()
     }
 
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
+    private fun persist() {
+        val s = _uiState.value
+        store.save(s.favoritePlaces, s.recentPlaces, s.selectedPlace)
     }
 
     private fun parseCoordinates(input: String): Pair<Double, Double>? {
-        val pattern = Regex("""^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$""")
-        val match = pattern.matchEntire(input) ?: return null
+        val match = COORD_REGEX.matchEntire(input) ?: return null
         val lat = match.groupValues[1].toDoubleOrNull() ?: return null
         val lng = match.groupValues[2].toDoubleOrNull() ?: return null
         if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
         return lat to lng
     }
 
-    private fun isSamePlace(a: PlaceSuggestion, b: PlaceSuggestion): Boolean {
-        return a.latitude == b.latitude && a.longitude == b.longitude
+    private companion object {
+        val COORD_REGEX = Regex("""^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$""")
+
+        fun isSamePlace(a: PlaceSuggestion, b: PlaceSuggestion): Boolean =
+            kotlin.math.abs(a.latitude - b.latitude) < 1e-5 && kotlin.math.abs(a.longitude - b.longitude) < 1e-5
     }
 }

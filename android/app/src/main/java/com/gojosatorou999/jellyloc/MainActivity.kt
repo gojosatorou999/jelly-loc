@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -57,10 +59,12 @@ class MainActivity : ComponentActivity() {
                 val running by MockLocationService.running.collectAsStateWithLifecycle()
                 val serviceError by MockLocationService.lastError.collectAsStateWithLifecycle()
                 var setupReady by remember { mutableStateOf(isSelectedMockLocationApp()) }
+                var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations()) }
 
-                // Re-check every time the user comes back (e.g. from Developer options)
+                // Re-check every time the user comes back (e.g. from Developer options / battery settings)
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
                     setupReady = isSelectedMockLocationApp()
+                    batteryUnrestricted = isIgnoringBatteryOptimizations()
                 }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
@@ -97,7 +101,8 @@ class MainActivity : ComponentActivity() {
                                 isMocking = running != null,
                                 error = serviceError ?: state.error,
                             ),
-                            setupReady = true,
+                            batteryUnrestricted = batteryUnrestricted,
+                            onFixBattery = ::requestIgnoreBatteryOptimizations,
                             onQueryChanged = viewModel::onQueryChanged,
                             onSuggestionSelected = { place ->
                                 viewModel.onSuggestionSelected(place)
@@ -106,8 +111,8 @@ class MainActivity : ComponentActivity() {
                                     MockLocationService.start(this, place.latitude, place.longitude, place.name)
                                 }
                             },
-                            onMapLongPressed = { lat, lng ->
-                                viewModel.onMapLongPressed(lat, lng)
+                            onMapPicked = { lat, lng ->
+                                viewModel.onMapPicked(lat, lng)
                                 if (running != null) MockLocationService.start(this, lat, lng, "Dropped pin")
                             },
                             onToggleFavorite = viewModel::toggleFavoriteSelected,
@@ -139,6 +144,17 @@ class MainActivity : ComponentActivity() {
     private fun hasLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun isIgnoringBatteryOptimizations(): Boolean =
+        getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+
+    private fun requestIgnoreBatteryOptimizations() {
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        } catch (e: ActivityNotFoundException) {
+            safeStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
 
     private fun openDeveloperOptions() {
         val enabled = Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1

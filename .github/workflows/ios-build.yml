@@ -1,0 +1,36 @@
+name: Build iOS host app
+
+# Compile check only (simulator, no signing) so the Xcode project is known-good before
+# someone builds it onto an iPhone. See docs/IOS-XCODE.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project JellyLocHost.xcodeproj \
+            -scheme JellyLocHost \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tail -n 40
+          exit "${PIPESTATUS[0]}"

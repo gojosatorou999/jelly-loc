@@ -209,20 +209,29 @@
 
           <!-- Android Tab -->
           <div id="tab-android" class="guide-tab-content" style="display: none; flex-direction: column; gap: 14px;">
-            <p>To use mock locations across Android apps (WhatsApp, Maps, etc.):</p>
+            <p>A website can't change your phone's location for other apps. To fake it for WhatsApp, Maps, etc., use the Jelly Loc Android app:</p>
             <div class="guide-step">
               <div class="step-num">1</div>
               <div class="step-body">
-                <strong>Enable Developer Options</strong>
-                <span>Go to <em>Settings → About Phone → Software info</em> and tap <strong>Build Number 7 times</strong>.</span>
+                <strong>Install the Android app</strong>
+                <span>Open this on your phone, install the APK, and follow the in-app setup.</span>
+                <a class="btn-secondary" style="margin-top: 6px; width: fit-content; text-decoration: none;" href="https://github.com/gojosatorou999/jelly-loc/releases/latest/download/jelly-loc.apk">⬇️ Download Jelly Loc APK</a>
               </div>
             </div>
 
             <div class="guide-step">
               <div class="step-num">2</div>
               <div class="step-body">
-                <strong>ADB Mock Location Script</strong>
-                <span>Run this one-liner in your terminal with USB debugging enabled:</span>
+                <strong>One-time setup</strong>
+                <span><em>Settings → About phone</em> → tap <strong>Build number</strong> 7 times → <em>Developer options → Select mock location app</em> → <strong>Jelly Loc</strong>.</span>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <strong>Alternative: ADB from a computer</strong>
+                <span>With USB debugging enabled, run this script on a computer connected to the phone:</span>
                 <button id="btn-download-adb" class="btn-secondary" style="margin-top: 6px; width: fit-content;">
                   ⬇️ Download ADB Shell Script
                 </button>

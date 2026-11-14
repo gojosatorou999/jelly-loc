@@ -12,7 +12,7 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import quote
 from xml.sax.saxutils import escape as xml_escape
 

@@ -1,0 +1,47 @@
+# XcodeGen spec — generates JellyLocHost.xcodeproj.  Run:  xcodegen generate
+# Full instructions: ../docs/IOS-XCODE.md
+name: JellyLocHost
+
+options:
+  bundleIdPrefix: com.gojosatorou999
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # DEVELOPMENT_TEAM is passed on the xcodebuild command line or picked in Xcode → Signing & Capabilities.
+
+targets:
+  JellyLocHost:
+    type: application
+    platform: iOS
+    sources:
+      - JellyLocHost
+    fileGroups:
+      - Locations/Location.gpx
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gojosatorou999.jellyloc.host
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Jelly Loc
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Shows the location iOS is currently reporting, so you can confirm the simulated location is active.
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+
+schemes:
+  JellyLocHost:
+    build:
+      targets:
+        JellyLocHost: all
+    run:
+      config: Debug
+      # Xcode feeds this GPX location to the whole iPhone while the app runs from Xcode.
+      simulateLocation:
+        allow: true
+        defaultLocation: Locations/Location.gpx
