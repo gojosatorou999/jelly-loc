@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,7 +42,7 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.MapEventsReceiver
+import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.Marker
 
 @Composable
@@ -66,7 +67,7 @@ fun MainScreen(
         onDispose { }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         OutlinedTextField(
             value = uiState.query,
             onValueChange = onQueryChanged,
@@ -112,7 +113,7 @@ fun MainScreen(
                 MapView(context).apply {
                     setMultiTouchControls(true)
                     controller.setZoom(14.0)
-                    controller.setCenter(GeoPoint(17.385f.toDouble(), 78.4867))
+                    controller.setCenter(GeoPoint(selected?.latitude ?: 17.385, selected?.longitude ?: 78.4867))
                     overlays.add(
                         MapEventsOverlay(
                             object : MapEventsReceiver {
@@ -222,28 +223,28 @@ fun MainScreen(
                 }
             }
         }
+    }
+}
 
-        @Composable
-        private fun QuickPlacesRow(
-            title: String,
-            places: List<PlaceSuggestion>,
-            onPick: (PlaceSuggestion) -> Unit,
+@Composable
+private fun QuickPlacesRow(
+    title: String,
+    places: List<PlaceSuggestion>,
+    onPick: (PlaceSuggestion) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(title, style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    places.forEach { place ->
-                        AssistChip(
-                            onClick = { onPick(place) },
-                            label = { Text(place.name.ifBlank { "${place.latitude}, ${place.longitude}" }) },
-                        )
-                    }
-                }
+            places.forEach { place ->
+                AssistChip(
+                    onClick = { onPick(place) },
+                    label = { Text(place.name.ifBlank { "${place.latitude}, ${place.longitude}" }) },
+                )
             }
         }
     }

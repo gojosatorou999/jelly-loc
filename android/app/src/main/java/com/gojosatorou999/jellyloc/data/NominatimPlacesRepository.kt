@@ -1,6 +1,8 @@
 package com.gojosatorou999.jellyloc.data
 
 import java.net.URLEncoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlinx.serialization.SerialName
@@ -20,14 +22,12 @@ class NominatimPlacesRepository(
             .header("User-Agent", "JellyLoc/1.0 (https://github.com/gojosatorou999/jelly-loc)")
             .build()
 
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) {
-            response.close()
-            return emptyList()
-        }
-
-        val body = response.body.string()
-        response.close()
+        // OkHttp's execute() blocks; never run it on the main thread
+        val body = withContext(Dispatchers.IO) {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) null else response.body?.string()
+            }
+        } ?: return emptyList()
         val parsed = json.decodeFromString<List<NominatimResult>>(body)
         return parsed.map {
             val parts = it.displayName.split(',').map(String::trim)

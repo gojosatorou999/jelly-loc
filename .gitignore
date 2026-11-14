@@ -6,3 +6,14 @@ __pycache__/
 .vercel/
 data/saved_state.json
 repo_source/
+
+.playwright-mcp/
+
+# Android build output & local config
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+*.jks
+*.keystore

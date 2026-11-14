@@ -12,7 +12,9 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
+from xml.sax.saxutils import escape as xml_escape
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -38,6 +40,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def revalidate_app_shell(request: Request, call_next):
+    """Make browsers revalidate HTML/JS/CSS on every load so new deploys show up immediately."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".js", ".css", ".html", ".json")):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
 
 # In-memory application state
 state: Dict[str, Any] = {
@@ -133,13 +144,18 @@ class LocationPayload(BaseModel):
     name: Optional[str] = "Selected Location"
     address: Optional[str] = ""
     jitter: Optional[bool] = True
+    jitter_meters: Optional[float] = None
     speed_kmh: Optional[float] = 0.0
     altitude: Optional[float] = 500.0
+    record_recent: bool = True
 
 
 class StepPayload(BaseModel):
     bearing: float = Field(..., ge=0, le=360)
     distance_meters: float = Field(default=10.0, gt=0, le=500)
+    # Optional starting point: lets stateless (serverless) instances step from the client's position
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
 
 
 class JitterPayload(BaseModel):
@@ -189,11 +205,18 @@ async def set_mock(payload: LocationPayload):
     state["is_mocking"] = True
     if payload.jitter is not None:
         state["jitter_enabled"] = payload.jitter
+    if payload.jitter_meters:
+        state["jitter_meters"] = payload.jitter_meters
+    if payload.speed_kmh:
+        state["sim_speed_kmh"] = payload.speed_kmh
     if payload.altitude is not None:
         state["altitude"] = payload.altitude
     state["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    # Add to recents (max 8, deduplicated by proximity)
+    if not payload.record_recent:
+        return {"status": "mocking_active", "location": get_current_effective_location()}
+
+    # Add to recent places (up to 8, no duplicates)
     new_recent = {
         "name": state["name"],
         "address": state["address"],
@@ -224,7 +247,10 @@ async def stop_mock():
 
 @app.post("/api/mock/step")
 async def step_mock(payload: StepPayload):
-    """Move the mocked position in a direction (joystick / D-Pad / keyboard)."""
+    """Move the mocked position in a direction (for Joystick / D-Pad controls)."""
+    if payload.latitude is not None and payload.longitude is not None:
+        state["latitude"] = payload.latitude
+        state["longitude"] = payload.longitude
     new_lat, new_lon = calculate_destination(
         state["latitude"],
         state["longitude"],
@@ -341,11 +367,24 @@ async def get_recents():
 # iOS & Android export tools
 # ---------------------------------------------------------------------------
 
-@app.get("/api/export/gpx")
-async def export_gpx(name: Optional[str] = None):
-    """Generate a standard GPX file for Xcode / 3uTools / LocationSimulator."""
+def resolve_location(lat: Optional[float], lon: Optional[float], name: Optional[str]) -> Dict[str, Any]:
+    """Use client-supplied coordinates when given (serverless-safe), else the server's state."""
     loc = get_current_effective_location()
-    place_name = name or loc["name"]
+    if lat is not None and lon is not None:
+        loc = dict(loc, latitude=lat, longitude=lon, address=f"{lat:.6f}, {lon:.6f}")
+        loc["name"] = name or f"{lat:.5f}, {lon:.5f}"
+    elif name:
+        loc["name"] = name
+    return loc
+
+LatQ = Query(default=None, ge=-90, le=90)
+LonQ = Query(default=None, ge=-180, le=180)
+
+@app.get("/api/export/gpx")
+async def export_gpx(name: Optional[str] = None, lat: Optional[float] = LatQ, lon: Optional[float] = LonQ):
+    """Generate an RFC-standard GPX file for Xcode (iOS Location Simulation), 3uTools, or LocationSimulator."""
+    loc = resolve_location(lat, lon, name)
+    place_name = xml_escape(loc["name"])
     lat = loc["latitude"]
     lon = loc["longitude"]
     ele = loc["altitude"]
@@ -365,7 +404,7 @@ async def export_gpx(name: Optional[str] = None):
     <ele>{ele}</ele>
     <time>{now_iso}</time>
     <name>{place_name}</name>
-    <desc>{loc["address"]}</desc>
+    <desc>{xml_escape(loc["address"])}</desc>
   </wpt>
 </gpx>"""
 
@@ -377,9 +416,10 @@ async def export_gpx(name: Optional[str] = None):
 
 
 @app.get("/api/export/adb")
-async def export_adb():
-    """Generate an ADB shell script for Android mock GPS."""
-    loc = get_current_effective_location()
+async def export_adb(name: Optional[str] = None, lat: Optional[float] = LatQ, lon: Optional[float] = LonQ):
+    """Generate ADB script commands for Android Mock Location & GPS Emulation."""
+    loc = resolve_location(lat, lon, name)
+    safe_name = re.sub(r"[^\w ,.\-()]", "", loc["name"])[:80]
     lat = loc["latitude"]
     lon = loc["longitude"]
 
@@ -387,7 +427,7 @@ async def export_adb():
 # Jelly Loc — Android ADB Mock Location Script
 # Connect your Android phone via USB/Wi-Fi with USB debugging enabled, then run this script.
 
-echo ">> Teleporting Android location to {loc['name']} ({lat}, {lon})..."
+echo ">> Teleporting Android location to {safe_name} ({lat}, {lon})..."
 
 # For Android Emulator:
 adb emu geo fix {lon} {lat}
@@ -405,9 +445,9 @@ echo ">> Done! Location updated."
 
 
 @app.get("/api/ios/shortcut")
-async def ios_shortcut():
-    """Formatted JSON for Apple Shortcuts on iPhone / iPad."""
-    loc = get_current_effective_location()
+async def ios_shortcut(name: Optional[str] = None, lat: Optional[float] = LatQ, lon: Optional[float] = LonQ):
+    """Formatted JSON for direct consumption by Apple Shortcuts on iPhone / iPad."""
+    loc = resolve_location(lat, lon, name)
     return {
         "status": "success",
         "name": loc["name"],
@@ -416,61 +456,90 @@ async def ios_shortcut():
         "accuracy": loc["accuracy"],
         "altitude": loc["altitude"],
         "is_mocking": loc["is_mocking"],
-        "apple_maps_url": f"https://maps.apple.com/?ll={loc['latitude']},{loc['longitude']}&q={loc['name']}",
+        "apple_maps_url": f"https://maps.apple.com/?ll={loc['latitude']},{loc['longitude']}&q={quote(loc['name'])}",
         "google_maps_url": f"https://www.google.com/maps?q={loc['latitude']},{loc['longitude']}",
     }
 
 
 @app.get("/api/hook.js")
-async def geolocation_hook(request: Request):
-    """JavaScript bookmarklet: overrides navigator.geolocation in any browser tab."""
-    host = request.headers.get("host", "localhost:8000")
-    scheme = request.headers.get("x-forwarded-proto", "http")
+async def geolocation_hook(
+    request: Request,
+    lat: Optional[float] = LatQ,
+    lon: Optional[float] = LonQ,
+    jitter: float = Query(default=4.5, ge=0, le=50),
+):
+    """JavaScript injection hook: overrides navigator.geolocation in the page it is injected into.
+
+    With ?lat=&lon= the coordinates are baked into the script (works on serverless hosts).
+    Without them, the script polls /api/location on this server.
+    """
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost:8000")
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     api_url = f"{scheme}://{host}/api/location"
+    fixed = "null" if lat is None or lon is None else f"{{latitude: {lat}, longitude: {lon}}}"
 
     hook_code = f"""// Jelly Loc HTML5 Geolocation Injector
 (function() {{
-  const API_URL = "{api_url}";
-  console.log("[JellyLoc] Geolocation Override active via " + API_URL);
+  if (window.__jellyLocHooked) {{ console.log("[JellyLoc] already active"); return; }}
+  window.__jellyLocHooked = true;
+  var API_URL = "{api_url}";
+  var FIXED = {fixed};
+  var JITTER_M = {jitter};
+  var geo = navigator.geolocation;
+  if (!geo) {{ console.warn("[JellyLoc] navigator.geolocation not available"); return; }}
 
-  async function fetchMockPos() {{
-    try {{
-      const res = await fetch(API_URL);
-      const data = await res.json();
-      return {{
-        coords: {{
-          latitude: data.latitude,
-          longitude: data.longitude,
-          accuracy: data.accuracy || 8,
-          altitude: data.altitude || 0,
-          altitudeAccuracy: 1,
-          heading: data.bearing || 0,
-          speed: data.speed || 0,
-        }},
-        timestamp: Date.now()
-      }};
-    }} catch (e) {{
-      console.warn("[JellyLoc] Failed to fetch mock location, using real GPS", e);
-      return null;
+  function jittered(lat, lon) {{
+    if (!JITTER_M) return [lat, lon];
+    var d = (Math.random() - 0.5) * JITTER_M;
+    var a = Math.random() * 2 * Math.PI;
+    return [lat + (d * Math.cos(a)) / 111320, lon + (d * Math.sin(a)) / (111320 * Math.cos(lat * Math.PI / 180))];
+  }}
+
+  function makePos(lat, lon, acc, alt, heading, speed) {{
+    return {{
+      coords: {{
+        latitude: lat, longitude: lon, accuracy: acc || 8,
+        altitude: alt || null, altitudeAccuracy: null,
+        heading: heading || null, speed: speed || null
+      }},
+      timestamp: Date.now()
+    }};
+  }}
+
+  function getMock() {{
+    if (FIXED) {{
+      var p = jittered(FIXED.latitude, FIXED.longitude);
+      return Promise.resolve(makePos(p[0], p[1], 6 + Math.random() * 4));
     }}
+    return fetch(API_URL, {{ cache: "no-store" }})
+      .then(function(r) {{ return r.json(); }})
+      .then(function(d) {{ return makePos(d.latitude, d.longitude, d.accuracy, d.altitude, d.bearing, d.speed); }});
   }}
 
-  if (navigator.geolocation) {{
-    const _origGet = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
-    navigator.geolocation.getCurrentPosition = async function(success, error, options) {{
-      const mock = await fetchMockPos();
-      if (mock) {{ success(mock); }} else {{ _origGet(success, error, options); }}
-    }};
-    navigator.geolocation.watchPosition = function(success) {{
-      return setInterval(async () => {{
-        const mock = await fetchMockPos();
-        if (mock) success(mock);
-      }}, 1000);
-    }};
-    console.log("[JellyLoc] navigator.geolocation successfully hooked!");
-  }}
+  var origGet = geo.getCurrentPosition.bind(geo);
+  var watches = {{}};
+  var nextId = 1;
+
+  geo.getCurrentPosition = function(success, error, options) {{
+    getMock().then(success).catch(function(e) {{
+      console.warn("[JellyLoc] mock fetch failed, using real location", e);
+      origGet(success, error, options);
+    }});
+  }};
+  geo.watchPosition = function(success, error, options) {{
+    var id = nextId++;
+    var tick = function() {{ getMock().then(success).catch(function(e) {{ if (error) error({{ code: 2, message: String(e) }}); }}); }};
+    tick();
+    watches[id] = setInterval(tick, 1000);
+    return id;
+  }};
+  geo.clearWatch = function(id) {{
+    clearInterval(watches[id]);
+    delete watches[id];
+  }};
+  console.log("[JellyLoc] navigator.geolocation hooked" + (FIXED ? " at " + FIXED.latitude + ", " + FIXED.longitude : " via " + API_URL));
 }})();"""
-    return Response(content=hook_code, media_type="application/javascript")
+    return Response(content=hook_code, media_type="application/javascript", headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------------------
@@ -507,7 +576,7 @@ async def web_manifest():
     raise HTTPException(status_code=404, detail="manifest.json not found")
 
 
-@app.get("/static/{file_path:path}")
+@app.api_route("/static/{file_path:path}", methods=["GET", "HEAD"])
 async def serve_static(file_path: str):
     """Serve static assets — styles, JS, icons, etc."""
     full_path = STATIC_DIR / file_path

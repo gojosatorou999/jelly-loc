@@ -5,6 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// CI passes these in; locally they're absent and the release build falls back to the debug key.
+val releaseKeystore: String? = System.getenv("JELLYLOC_KEYSTORE_PATH")
+val buildNumber: Int = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
 android {
     namespace = "com.gojosatorou999.jellyloc"
     compileSdk = 35
@@ -13,10 +17,21 @@ android {
         applicationId = "com.gojosatorou999.jellyloc"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber
+        versionName = "1.0.$buildNumber"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (releaseKeystore != null && file(releaseKeystore).exists()) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("JELLYLOC_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("JELLYLOC_KEY_ALIAS")
+                keyPassword = System.getenv("JELLYLOC_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +41,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -46,6 +62,7 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation(composeBom)
@@ -55,7 +72,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation("com.google.android.gms:play-services-location:21.3.0")

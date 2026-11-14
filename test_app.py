@@ -2,10 +2,11 @@
 Automated validation script for Jelly Loc FastAPI server & PWA assets.
 """
 
+import os
 import sys
 import httpx
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.environ.get("JELLY_URL", "http://127.0.0.1:8000")
 
 def run_tests():
     print("🧪 Running Jelly Loc End-to-End Validation Tests...\n")

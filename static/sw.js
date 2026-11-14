@@ -1,11 +1,12 @@
 // Jelly Loc PWA Service Worker
-const CACHE_NAME = 'jelly-loc-v2.1.0';
+// App shell is network-first (so deploys show up immediately) with cache fallback for offline.
+const CACHE_NAME = 'jelly-loc-v3';
+const TILE_CACHE = 'jelly-loc-tiles';
 const STATIC_ASSETS = [
   '/',
+  '/static/styles.css?v=3',
+  '/static/app.js?v=3',
   '/manifest.json',
-  '/sw.js',
-  '/static/styles.css',
-  '/static/app.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/apple-touch-icon.png',
@@ -18,84 +19,54 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching offline application shell');
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[SW] Pre-cache partial failure:', err);
-      });
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => Promise.allSettled(STATIC_ASSETS.map((u) => cache.add(u))))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', key);
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== TILE_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const req = event.request;
+  if (req.method !== 'GET') return; // let POST/DELETE go straight to the network
+  const url = new URL(req.url);
 
-  // Dynamic API calls: Network-first
-  if (url.pathname.startsWith('/api/')) {
+  // API: always network, never cached
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+
+  // Map tiles: stale-while-revalidate
+  if (url.hostname === 'server.arcgisonline.com' || url.hostname.endsWith('tile.openstreetmap.org')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(event.request);
-      })
+      caches.open(TILE_CACHE).then((cache) =>
+        cache.match(req).then((cached) => {
+          const network = fetch(req).then((res) => {
+            if (res.ok) cache.put(req, res.clone());
+            return res;
+          }).catch(() => cached);
+          return cached || network;
+        })
+      )
     );
     return;
   }
 
-  // OpenStreetMap tile caching (Stale-While-Revalidate)
-  if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('basemaps.cartocdn.com')) {
-    event.respondWith(
-      caches.open('jelly-loc-tiles').then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchPromise = fetch(event.request).then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => cachedResponse);
-
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
-    return;
-  }
-
-  // Static Assets: Cache-first with network fallback
+  // App shell & libraries: network-first, fall back to cache when offline
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
+    fetch(req).then((res) => {
+      if (res && res.ok && (url.origin === self.location.origin || url.hostname === 'unpkg.com')) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
       }
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
-      });
-    })
+      return res;
+    }).catch(() =>
+      caches.match(req).then((cached) => cached || (req.mode === 'navigate' ? caches.match('/') : Response.error()))
+    )
   );
 });

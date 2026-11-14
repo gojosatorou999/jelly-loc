@@ -12,6 +12,7 @@
 
   <!-- Apple iOS PWA Meta -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Jelly Loc" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
@@ -32,7 +33,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
   <!-- Custom App Styles -->
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=3" />
 </head>
 <body>
   <div id="app-container">
@@ -145,6 +146,10 @@
               <span class="telemetry-label">ACCURACY</span>
               <span id="telemetry-acc" class="telemetry-value">±7.0m</span>
             </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">SPEED</span>
+              <span id="telemetry-speed" class="telemetry-value">5 km/h</span>
+            </div>
           </div>
 
           <!-- Quick Favorites and Recents Horizontal Chips -->
@@ -156,6 +161,7 @@
               <span id="btn-set-mock-text">Set Location</span>
             </button>
           </div>
+          <div class="map-attribution">Tiles © <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a> · Search © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
         </div>
       </footer>
     </div>
@@ -194,7 +200,7 @@
               <div class="step-body">
                 <strong>Apple Shortcuts One-Tap Webhook</strong>
                 <span>Open iOS Shortcuts app → Add Action: "Get Contents of URL" pointing to:</span>
-                <div class="code-snippet">
+                <div class="code-snippet" style="word-break: break-all;">
                   <span id="shortcut-url">/api/ios/shortcut</span>
                 </div>
               </div>
@@ -298,6 +304,6 @@
   <!-- Leaflet Map JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <!-- Application Script -->
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>
